@@ -1,142 +1,171 @@
-# Free Fire info Discord Bot
+# Free Fire Info Bot
 
-![Status](https://img.shields.io/badge/status-active-brightgreen)
+A Discord bot that provides detailed information about Free Fire players using their UID.
 
-An asynchronous Discord bot that provides a **REST API** to retrieve detailed information about a **Free Fire account** using its UID.  
-It returns profile data such as level, rank, guild info, credit score, social preferences, and more. The bot includes a built-in Flask server for uptime support on Render.
+## Features
 
-## 🚀 Features
+- 🎮 Get detailed player information by UID
+- 📊 View player stats, clan info, and achievements
+- 🖼️ Generate player outfit images
+- ⚙️ Configurable channel restrictions
+- 🛡️ Rate limiting and cooldown system
+- 🌐 Optimized for Render deployment
 
-- Integrated API to fetch Free Fire account data via UID
-- Detailed data: level, rank, guild, credit score, full profile
-- Secure credentials using `.env`
-- Built-in Flask server for Render deployment
+## Commands
 
-## Requirements
+- `!info <UID>` - Get player information
+- `!setinfochannel <#channel>` - Set allowed channel (Admin only)
+- `!removeinfochannel <#channel>` - Remove channel restriction (Admin only)
+- `!infochannels` - List allowed channels
 
-- Python 3.8+
-- A Discord bot token
-- A `.env` file containing:
-  ```ini
-  TOKEN=your_bot_token
-  PORT=10000
-  ```
+## Deployment on Render
 
-## Installation
+### Prerequisites
 
-1. Clone this repository:
-   ```sh
-   git clone https://github.com/K0986/info-discord-bot-supremo
-   cd info-discord-bot-supremo
-   ```
-2. Create and activate a virtual environment:
-   ```sh
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```sh
-   pip install -r requirements.txt
-   ```
-4. Create a `.env` file in the root directory and add your credentials:
-   ```ini
-   TOKEN=your_bot_token
-   PORT=10000
-   ```
-5. Run the bot:
-   ```sh
-   python app.py
-   ```
+1. Create a Discord application and bot at [Discord Developer Portal](https://discord.com/developers/applications)
+2. Get your bot token
+3. Create a Render account
 
-## 🚀 Render Deployment
+### Setup
 
-This bot is optimized for deployment on Render. Follow these steps:
+1. **Fork/Clone this repository**
 
-1. **Fork or clone** this repository to your GitHub account
-2. **Go to [Render.com](https://render.com)** and sign up/login
-3. **Create a new Web Service:**
-   - Click "New +" → "Web Service"
-   - Connect your GitHub account
-   - Select your repository
-   - Choose "Python" as the environment
-4. **Configure the service:**
-   - **Name:** `freefire-info-bot` (or any name you prefer)
-   - **Environment:** `Python`
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `python app.py`
-5. **Add Environment Variables:**
-   - `TOKEN`: Your Discord bot token
-   - `PORT`: `10000` (Render will set this automatically)
-6. **Deploy!** Render will automatically build and deploy your bot
+2. **Set up on Render:**
+   - Create a new Web Service
+   - Connect your GitHub repository
+   - Set environment variables:
+     - `TOKEN`: Your Discord bot token
+     - `PORT`: 10000 (or leave default)
 
-## 📸 Demo
+3. **Deploy:**
+   - Render will automatically build and deploy your bot
+   - The bot will start automatically
 
+### Environment Variables
 
-<div align="center">
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `TOKEN` | Discord bot token | Yes |
+| `PORT` | Port for web server | No (default: 10000) |
+| `RENDER` | Set by Render automatically | No |
 
+## Troubleshooting
 
-<img width="591" height="820" alt="image" src="https://github.com/user-attachments/assets/9d07608d-e6d2-4afd-9a1f-ba16aeeca59f" />
-<img width="538" height="377" alt="image" src="https://github.com/user-attachments/assets/f748a4c6-7670-45e4-ac08-5fd8fc746ab9" />
- 
-</div>
+### Bot Keeps Disconnecting
 
+**Common Causes:**
+1. **Memory leaks** - Fixed in latest version
+2. **Resource limits** - Render free tier has strict limits
+3. **Network timeouts** - Added timeout handling
+4. **File system issues** - Disabled file operations on Render
 
+**Solutions:**
+- ✅ Use the latest code with improved resource management
+- ✅ Monitor logs in Render dashboard
+- ✅ Check bot status at `/health` endpoint
 
-## Usage
+### Performance Issues
 
-- Use `!info <user_id>` in a Discord server where the bot is present.
-- The bot will fetch  information from [free-fire-info-api](https://github.com/paulafredo/free-fire-info-api) and respond with an embedded message.
+**Optimizations Made:**
+- Single `aiohttp.ClientSession` for all requests
+- Proper resource cleanup
+- Garbage collection after operations
+- Timeout handling for all requests
+- Disabled file operations on Render
 
+### Monitoring
 
+**Health Check:**
+```bash
+curl https://your-bot-name.onrender.com/health
+```
 
-## 🛠️ Create a Discord Bot
+**Expected Response:**
+```json
+{
+  "status": "healthy",
+  "bot": "YourBotName#1234"
+}
+```
 
-1. Go to the [Discord Developer Portal](https://discord.com/developers/applications).
-2. Click **"New Application"**, and give your bot a name.
-3. In the left sidebar, go to the **"Bot"** section and click **"Add Bot"**, then confirm with **"Yes, do it!"**.
-4. Under the **Token** section, click **"Reset Token"** or **"Copy"** to get your `TOKEN`.
-5. Go to **"General Information"** and copy the `APPLICATION_ID`.
-6. Paste both values into your `.env` file:
-      ```ini
-   TOKEN=your_bot_token
-   ```
+### Logs
 
+Check Render logs for:
+- Connection errors
+- Memory usage
+- API timeouts
+- Resource cleanup
 
-## 🔗 Invite the Bot to a Discord Server
+## Development
 
-1. Go to **OAuth2 > URL Generator** in the Developer Portal.
-2. Under **Scopes**, check:
-   - `bot`
-   - `applications.commands`
-3. Under **Bot Permissions**, check at least:
-   - `Send Messages`
-   - `Embed Links`
-4. Copy the generated URL and open it in your browser to invite the bot to your server.
+### Local Setup
 
+1. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-## 📚 Bot Commands
+2. Set environment variables:
+```bash
+export TOKEN=your_discord_bot_token
+```
 
-### `!info <user_id>`
-Check whether a Free Fire account is **banned** or **not**.
+3. Run the bot:
+```bash
+python app.py
+```
 
-- 📥 **Input:** a user ID (UID)
+### File Structure
 
+```
+├── app.py              # Main bot file
+├── cogs/
+│   └── infoCommands.py # Bot commands
+├── requirements.txt     # Dependencies
+├── render.yaml         # Render configuration
+├── Procfile           # Process file
+└── README.md          # This file
+```
 
+## Technical Details
 
+### Architecture
 
+- **Discord.py**: Bot framework
+- **Flask**: Web server for health checks
+- **Waitress**: Production WSGI server
+- **aiohttp**: Async HTTP client
+- **Render**: Hosting platform
 
-## Technologies Used
+### Resource Management
 
-- Python
-- Discord.py
-- Flask
-- dotenv
+- Single HTTP session per bot instance
+- Automatic garbage collection
+- Proper cleanup on shutdown
+- Timeout handling for all requests
+- Memory-efficient operations
+
+### Security
+
+- Environment variable for sensitive data
+- Input validation for UIDs
+- Rate limiting per user
+- Channel permission checks
+
+## Support
+
+If you encounter issues:
+
+1. Check the Render logs
+2. Verify your bot token is correct
+3. Ensure the bot has proper permissions
+4. Test the health endpoint
 
 ## License
 
-This project is licensed under the MIT License. Feel free to use and modify it.
+This project is developed by THUG.
 
-## Author
+---
 
-[Paul Alfredo](https://github.com/paulafredo)
+**Note:** This bot is optimized for Render's free tier limitations. For production use, consider upgrading to a paid plan or using a different hosting provider.
 

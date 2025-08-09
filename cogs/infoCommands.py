@@ -9,7 +9,10 @@ import asyncio
 import io
 import uuid
 import gc
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 CONFIG_FILE = "info_channels.json"
 
@@ -19,24 +22,22 @@ class InfoCommands(commands.Cog):
         self.bot = bot
         self.api_url = "https://rawthug.onrender.com/info"
         self.generate_url = "https://generatethug.onrender.com/generate"
-        self.session = aiohttp.ClientSession()
+        # Use the bot's session instead of creating a new one
+        self.session = bot.session
         self.config_data = self.load_config()
         self.cooldowns = {}
 
-   
-
-    
-
-    def convert_unix_timestamp(self ,timestamp: int) -> str:
-        return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
-
-
+    def convert_unix_timestamp(self, timestamp: int) -> str:
+        try:
+            return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        except (ValueError, TypeError):
+            return "Invalid timestamp"
 
     def check_request_limit(self, guild_id):
         try:
             return self.is_server_subscribed(guild_id) or not self.is_limit_reached(guild_id)
         except Exception as e:
-            print(f"Error checking request limit: {e}")
+            logger.error(f"Error checking request limit: {e}")
             return False
 
     def load_config(self):
@@ -49,6 +50,11 @@ class InfoCommands(commands.Cog):
             }
         }
 
+        # On Render, use environment variables or memory storage instead of file
+        if os.environ.get('RENDER'):
+            logger.info("Running on Render - using default config")
+            return default_config
+
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, 'r') as f:
@@ -60,37 +66,43 @@ class InfoCommands(commands.Cog):
                     loaded_config.setdefault("servers", {})
                     return loaded_config
             except (json.JSONDecodeError, IOError) as e:
-                print(f"Error loading config: {e}")
+                logger.error(f"Error loading config: {e}")
                 return default_config
         return default_config
 
     def save_config(self):
+        # Skip file operations on Render
+        if os.environ.get('RENDER'):
+            logger.info("Skipping config save on Render")
+            return
+            
         try:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.config_data, f, indent=4, ensure_ascii=False)
         except IOError as e:
-            print(f"Error saving config: {e}")
-
-
+            logger.error(f"Error saving config: {e}")
 
     async def is_channel_allowed(self, ctx):
         try:
             guild_id = str(ctx.guild.id)
             allowed_channels = self.config_data["servers"].get(guild_id, {}).get("info_channels", [])
 
-            # Autoriser tous les salons si aucun salon n'a été configuré pour ce serveur
+            # Allow all channels if no channels configured for this server
             if not allowed_channels:
                 return True
 
-            # Sinon, vérifier si le salon actuel est dans la liste autorisée
+            # Otherwise, check if current channel is in allowed list
             return str(ctx.channel.id) in allowed_channels
         except Exception as e:
-            print(f"Error checking channel permission: {e}")
+            logger.error(f"Error checking channel permission: {e}")
             return False
 
     @commands.hybrid_command(name="setinfochannel", description="Allow a channel for !info commands")
     @commands.has_permissions(administrator=True)
     async def set_info_channel(self, ctx: commands.Context, channel: discord.TextChannel):
+        if os.environ.get('RENDER'):
+            return await ctx.send("❌ Configuration commands are disabled on Render deployment.")
+            
         guild_id = str(ctx.guild.id)
         self.config_data["servers"].setdefault(guild_id, {"info_channels": [], "config": {}})
         if str(channel.id) not in self.config_data["servers"][guild_id]["info_channels"]:
@@ -103,6 +115,9 @@ class InfoCommands(commands.Cog):
     @commands.hybrid_command(name="removeinfochannel", description="Remove a channel from !info commands")
     @commands.has_permissions(administrator=True)
     async def remove_info_channel(self, ctx: commands.Context, channel: discord.TextChannel):
+        if os.environ.get('RENDER'):
+            return await ctx.send("❌ Configuration commands are disabled on Render deployment.")
+            
         guild_id = str(ctx.guild.id)
         if guild_id in self.config_data["servers"]:
             if str(channel.id) in self.config_data["servers"][guild_id]["info_channels"]:
@@ -146,12 +161,10 @@ class InfoCommands(commands.Cog):
         guild_id = str(ctx.guild.id)
 
         if not uid.isdigit() or len(uid) < 6:
-            return await ctx.reply(" Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
+            return await ctx.reply("❌ Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
 
         if not await self.is_channel_allowed(ctx):
-            return await ctx.send(" This command is not allowed in this channel.", ephemeral=True)
-
-
+            return await ctx.send("❌ This command is not allowed in this channel.", ephemeral=True)
 
         cooldown = self.config_data["global_settings"]["default_cooldown"]
         if guild_id in self.config_data["servers"]:
@@ -161,21 +174,19 @@ class InfoCommands(commands.Cog):
             last_used = self.cooldowns[ctx.author.id]
             if (datetime.now() - last_used).seconds < cooldown:
                 remaining = cooldown - (datetime.now() - last_used).seconds
-                return await ctx.send(f" Please wait {remaining}s before using this command again", ephemeral=True)
+                return await ctx.send(f"⏳ Please wait {remaining}s before using this command again", ephemeral=True)
 
         self.cooldowns[ctx.author.id] = datetime.now()
-       
 
         try:
             async with ctx.typing():
-                async with self.session.get(f"{self.api_url}?uid={uid}") as response:
+                async with self.session.get(f"{self.api_url}?uid={uid}", timeout=aiohttp.ClientTimeout(total=30)) as response:
                     if response.status == 404:
-                        return await ctx.send(f" Player with UID `{uid}` not found.")
+                        return await ctx.send(f"❌ Player with UID `{uid}` not found.")
                     if response.status != 200:
-                        return await ctx.send("API error. Try again later.")
+                        return await ctx.send("⚠️ API error. Try again later.")
                     data = await response.json()
 
-            
             basic_info = data.get('basicInfo', {})
             captain_info = data.get('captainBasicInfo', {})
             clan_info = data.get('clanBasicInfo', {})
@@ -184,11 +195,10 @@ class InfoCommands(commands.Cog):
             profile_info = data.get('profileInfo', {})
             social_info = data.get('socialInfo', {})
 
-
             region = basic_info.get('region', 'Not found')
 
             embed = discord.Embed(
-                title=" Player Information",
+                title="🎮 Player Information",
                 color=discord.Color.blurple(),
                 timestamp=datetime.now()
             )
@@ -204,7 +214,6 @@ class InfoCommands(commands.Cog):
                 f"**├─ Honor Score**: {credit_score_info.get('creditScore', 'Not found')}",
                 f"**└─ Signature**: {social_info.get('signature', 'None') or 'None'}"
             ]), inline=False)
-          
 
             embed.add_field(name="", value="\n".join([
                 "**┌  ACCOUNT ACTIVITY**",
@@ -214,7 +223,6 @@ class InfoCommands(commands.Cog):
                 f"**├─ CS Rank**: {'' if basic_info.get('showCsRank') else 'Not found'} {basic_info.get('csRankingPoints', '?')} ",
                 f"**├─ Created At**: {self.convert_unix_timestamp(int(basic_info.get('createAt', 'Not found')))}",
                 f"**└─ Last Login**: {self.convert_unix_timestamp(int(basic_info.get('lastLoginAt', 'Not found')))}"
-
             ]), inline=False)
 
             embed.add_field(name="", value="\n".join([
@@ -244,46 +252,52 @@ class InfoCommands(commands.Cog):
                 if captain_info:
                     guild_info.extend([
                         "**└─ Leader Info**:",
-                        f"    **├─ Leader Name**: {captain_info.get('nickname', 'Not found')}",
-                        f"    **├─ Leader UID**: `{captain_info.get('accountId', 'Not found')}`",
-                        f"    **├─ Leader Level**: {captain_info.get('level', 'Not found')} (Exp: {captain_info.get('exp', '?')})",
-                        f"    **├─ Last Login**: {self.convert_unix_timestamp(int(captain_info.get('lastLoginAt', 'Not found')))}",
-                        f"    **├─ Title**: {captain_info.get('title', 'Not found')}",
-                        f"    **├─ BP Badges**: {captain_info.get('badgeCnt', '?')}",
-                        f"    **├─ BR Rank**: {'' if captain_info.get('showBrRank') else 'Not found'} {captain_info.get('rankingPoints', 'Not found')}",
-                        f"    **└─ CS Rank**: {'' if captain_info.get('showCsRank') else 'Not found'} {captain_info.get('csRankingPoints', 'Not found')} "
+                        f"    **├─ Leader Name**: {captain_info.get('nickname', 'Not found')}",
+                        f"    **├─ Leader UID**: `{captain_info.get('accountId', 'Not found')}`",
+                        f"    **├─ Leader Level**: {captain_info.get('level', 'Not found')} (Exp: {captain_info.get('exp', '?')})",
+                        f"    **├─ Last Login**: {self.convert_unix_timestamp(int(captain_info.get('lastLoginAt', 'Not found')))}",
+                        f"    **├─ Title**: {captain_info.get('title', 'Not found')}",
+                        f"    **├─ BP Badges**: {captain_info.get('badgeCnt', '?')}",
+                        f"    **├─ BR Rank**: {'' if captain_info.get('showBrRank') else 'Not found'} {captain_info.get('rankingPoints', 'Not found')}",
+                        f"    **└─ CS Rank**: {'' if captain_info.get('showCsRank') else 'Not found'} {captain_info.get('csRankingPoints', 'Not found')} "
                     ])
                 embed.add_field(name="", value="\n".join(guild_info), inline=False)
-
-
 
             embed.set_footer(text="DEVELOPED BY THUG")
             await ctx.send(embed=embed)
 
+            # Generate and send image if region and uid are available
             if region and uid:
                 try:
                     image_url = f"{self.generate_url}?uid={uid}"
-                    print(f"Url d'image = {image_url}")
-                    if image_url:
-                        async with self.session.get(image_url) as img_file:
-                            if img_file.status == 200:
-                                with io.BytesIO(await img_file.read()) as buf:
-                                    file = discord.File(buf, filename=f"outfit_{uuid.uuid4().hex[:8]}.png")
-                                    await ctx.send(file=file)  # ✅ ENVOYER L'IMAGE
-                                    print("Image envoyée avec succès")
-                            else:
-                                print(f"Erreur HTTP: {img_file.status}")
+                    logger.info(f"Generating image: {image_url}")
+                    
+                    async with self.session.get(image_url, timeout=aiohttp.ClientTimeout(total=30)) as img_response:
+                        if img_response.status == 200:
+                            img_data = await img_response.read()
+                            with io.BytesIO(img_data) as buf:
+                                file = discord.File(buf, filename=f"outfit_{uuid.uuid4().hex[:8]}.png")
+                                await ctx.send(file=file)
+                                logger.info("Image sent successfully")
+                        else:
+                            logger.warning(f"Image generation failed with status: {img_response.status}")
+                except asyncio.TimeoutError:
+                    logger.warning("Image generation timed out")
                 except Exception as e:
-                    print("Image generation failed:", e)
+                    logger.error(f"Image generation failed: {e}")
 
+        except asyncio.TimeoutError:
+            await ctx.send("⏰ Request timed out. Please try again.")
         except Exception as e:
-            await ctx.send(f" Unexpected error: `{e}`")
+            logger.error(f"Error in player_info: {e}")
+            await ctx.send(f"❌ Unexpected error: `{e}`")
         finally:
+            # Force garbage collection
             gc.collect()
 
-
     async def cog_unload(self):
-        await self.session.close()
+        """Cleanup when cog is unloaded"""
+        logger.info("InfoCommands cog unloaded")
 
     async def _send_player_not_found(self, ctx, uid):
         embed = discord.Embed(
@@ -307,7 +321,6 @@ class InfoCommands(commands.Cog):
             description="The Free Fire API is not responding. Try again later.",
             color=0xF39C12
         ))
-
 
 
 async def setup(bot):
