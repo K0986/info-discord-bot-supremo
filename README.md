@@ -1,17 +1,16 @@
-#  Free Fire info Discord Bot
+# Free Fire info Discord Bot
 
 ![Status](https://img.shields.io/badge/status-active-brightgreen)
 
 An asynchronous Discord bot that provides a **REST API** to retrieve detailed information about a **Free Fire account** using its UID.  
-It returns profile data such as level, rank, guild info, credit score, social preferences, and more. The bot includes a built-in Flask server for uptime support on Render/Railway.
-
-
+It returns profile data such as level, rank, guild info, credit score, social preferences, and more. The bot includes a built-in Flask server for uptime support on Render.
 
 ## 🚀 Features
 
--  Integrated API to fetch Free Fire account data via UID
--  Detailed data: level, rank, guild, credit score, full profile
-- Secure credentials using `.env`.
+- Integrated API to fetch Free Fire account data via UID
+- Detailed data: level, rank, guild, credit score, full profile
+- Secure credentials using `.env`
+- Built-in Flask server for Render deployment
 
 ## Requirements
 
@@ -20,38 +19,55 @@ It returns profile data such as level, rank, guild info, credit score, social pr
 - A `.env` file containing:
   ```ini
   TOKEN=your_bot_token
-  PORT = port where the bot will turn
+  PORT=10000
   ```
 
 ## Installation
 
 1. Clone this repository:
    ```sh
-   git clone https://github.com/paulafredo/free-freefire-info-bot
-   cd your-repo
+   git clone https://github.com/K0986/info-discord-bot-supremo
+   cd info-discord-bot-supremo
    ```
 2. Create and activate a virtual environment:
    ```sh
    python -m venv .venv
    source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
-   
+   ```
 3. Install dependencies:
    ```sh
    pip install -r requirements.txt
    ```
-
-
-
 4. Create a `.env` file in the root directory and add your credentials:
    ```ini
    TOKEN=your_bot_token
-   PORT = port where the bot will turn
+   PORT=10000
    ```
-
 5. Run the bot:
    ```sh
    python app.py
    ```
+
+## 🚀 Render Deployment
+
+This bot is optimized for deployment on Render. Follow these steps:
+
+1. **Fork or clone** this repository to your GitHub account
+2. **Go to [Render.com](https://render.com)** and sign up/login
+3. **Create a new Web Service:**
+   - Click "New +" → "Web Service"
+   - Connect your GitHub account
+   - Select your repository
+   - Choose "Python" as the environment
+4. **Configure the service:**
+   - **Name:** `freefire-info-bot` (or any name you prefer)
+   - **Environment:** `Python`
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `python app.py`
+5. **Add Environment Variables:**
+   - `TOKEN`: Your Discord bot token
+   - `PORT`: `10000` (Render will set this automatically)
+6. **Deploy!** Render will automatically build and deploy your bot
 
 ## 📸 Demo
 

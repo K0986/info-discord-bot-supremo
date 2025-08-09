@@ -7,6 +7,7 @@ import sys
 import aiohttp
 import asyncio
 from dotenv import load_dotenv
+import threading
 
 # Initialize environment variables
 load_dotenv()
@@ -20,10 +21,15 @@ def home():
     """Health check endpoint for Render"""
     return f"Bot {bot_name} is operational"
 
+@app.route('/health')
+def health():
+    """Health check endpoint for Render"""
+    return {"status": "healthy", "bot": bot_name}
+
 def run_flask():
     """Run Flask with Render-compatible settings"""
     port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 # Discord Bot Setup
 TOKEN = os.getenv("TOKEN")
@@ -67,11 +73,11 @@ class Bot(commands.Bot):
         print(f"🌐 Serving {len(self.guilds)} servers")
         
         # Start Flask if running on Render
-        if os.environ.get('RENDER'):
+        if os.environ.get('RENDER') or os.environ.get('PORT'):
             import threading
             flask_thread = threading.Thread(target=run_flask, daemon=True)
             flask_thread.start()
-            print("🚀 Flask server started in background")
+            print("🚀 Flask server started in background for Render")
 
     @tasks.loop(minutes=5)
     async def update_status(self):
@@ -108,7 +114,7 @@ async def main():
 
 if __name__ == "__main__":
     # Special handling for Render's environment
-    if os.environ.get('RENDER'):
+    if os.environ.get('RENDER') or os.environ.get('PORT'):
         asyncio.run(main())
     else:
         bot = Bot()
